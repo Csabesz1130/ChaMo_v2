@@ -1,3 +1,8 @@
+"""
+ChaMo_v2: Main application window implementation.
+Provides the main GUI window for the signal analysis application.
+"""
+
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from matplotlib.figure import Figure
@@ -8,7 +13,9 @@ from typing import Optional, Dict, Any
 import json
 
 from ..io_utils.atf_handler import ATFHandler
-from ..filtering.traditional_filters import (SavitzkyGolayFilter, FFTFilter, ButterworthFilter)
+from ..filtering.traditional_filters import (SavitzkyGolayFilter, 
+                                          FFTFilter, 
+                                          ButterworthFilter)
 from ..filtering.adaptive_filters import AdaptivePatternFilter
 from ..filtering.utils import calculate_signal_metrics
 from .filter_controls import FilterControls
@@ -17,13 +24,15 @@ class MainWindow:
     def __init__(self, root):
         self.root = root
         self.root.title("ChaMo v2 - Channel Analysis Tool")
-        self.root.state('zoomed')
+        self.root.state('zoomed')  # Start maximized
 
+        # Data storage
         self.atf_handler: Optional[ATFHandler] = None
         self.original_data: Optional[np.ndarray] = None
         self.filtered_data: Optional[np.ndarray] = None
         self.time_data: Optional[np.ndarray] = None
         
+        # Filter instances
         self.filters = {
             'savgol': SavitzkyGolayFilter(),
             'fft': FFTFilter(),
@@ -31,61 +40,93 @@ class MainWindow:
             'adaptive': AdaptivePatternFilter()
         }
 
+        # Create main layout
         self._create_menu()
         self._create_main_layout()
         self._setup_plot()
 
+        # Status bar
         self.status_var = tk.StringVar(value="Ready")
         self._create_status_bar()
 
     def _create_menu(self):
+        """Create the main menu bar"""
         menubar = tk.Menu(self.root)
         self.root.config(menu=menubar)
 
+        # File menu
         file_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="Open ATF File", command=self._load_file, accelerator="Ctrl+O")
-        file_menu.add_command(label="Save Filtered Data", command=self._save_filtered_data, accelerator="Ctrl+S")
+        file_menu.add_command(label="Open", command=self._load_file)
+        file_menu.add_command(label="Save Filtered Data", 
+                            command=self._save_filtered_data)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.root.quit)
 
+        # View menu
         view_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="View", menu=view_menu)
         view_menu.add_command(label="Reset View", command=self._reset_view)
-        view_menu.add_command(label="Show Statistics", command=self._show_statistics_window)
+        view_menu.add_command(label="Show Statistics", 
+                            command=self._show_statistics_window)
 
-        # Bind keyboard shortcuts
-        self.root.bind('<Control-o>', lambda e: self._load_file())
-        self.root.bind('<Control-s>', lambda e: self._save_filtered_data())
+        # Tools menu
+        tools_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Tools", menu=tools_menu)
+        tools_menu.add_command(label="Batch Process", 
+                             command=self._show_batch_process)
+        tools_menu.add_command(label="Export Settings", 
+                             command=self._export_settings)
+        tools_menu.add_command(label="Import Settings", 
+                             command=self._import_settings)
+
+        # Help menu
+        help_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="Documentation", 
+                            command=self._show_documentation)
+        help_menu.add_command(label="About", command=self._show_about)
 
     def _create_main_layout(self):
+        """Create the main application layout"""
+        # Main container
         self.main_frame = ttk.Frame(self.root)
         self.main_frame.pack(fill='both', expand=True)
 
+        # Create left frame for plot
         self.plot_frame = ttk.Frame(self.main_frame)
         self.plot_frame.pack(side='left', fill='both', expand=True)
 
+        # Create right frame for controls
         self.control_frame = ttk.Frame(self.main_frame)
         self.control_frame.pack(side='right', fill='y')
 
-        self.filter_controls = FilterControls(self.control_frame, self._handle_control_event)
+        # Add filter controls
+        self.filter_controls = FilterControls(self.control_frame, 
+                                            self._handle_control_event)
 
     def _setup_plot(self):
+        """Setup the matplotlib plot"""
         self.fig = Figure(figsize=(10, 6), dpi=100)
         self.ax = self.fig.add_subplot(111)
         
+        # Create canvas
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.plot_frame)
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(fill='both', expand=True)
         
+        # Add toolbar
         self.toolbar = NavigationToolbar2Tk(self.canvas, self.plot_frame)
         self.toolbar.update()
 
     def _create_status_bar(self):
-        status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
+        """Create status bar at bottom of window"""
+        status_bar = ttk.Label(self.root, textvariable=self.status_var, 
+                             relief=tk.SUNKEN, anchor=tk.W)
         status_bar.pack(side='bottom', fill='x')
 
     def _load_file(self):
+        """Load an ATF file"""
         try:
             filepath = filedialog.askopenfilename(
                 title="Select ATF file",
@@ -98,18 +139,26 @@ class MainWindow:
             self.status_var.set(f"Loading {Path(filepath).name}...")
             self.root.update()
 
+            # Load ATF file
             self.atf_handler = ATFHandler(filepath)
             if not self.atf_handler.load_atf():
                 raise ValueError("Failed to load ATF file")
 
+            # Get data
             self.time_data = self.atf_handler.get_time_data()
             self.original_data = self.atf_handler.get_current_data()
             self.filtered_data = None
 
+            # Update plot
             self._update_plot()
             
-            self.filter_controls.set_time_range(self.time_data[0], self.time_data[-1])
+            # Update controls
+            self.filter_controls.set_time_range(
+                self.time_data[0], 
+                self.time_data[-1]
+            )
             
+            # Update statistics
             stats = calculate_signal_metrics(self.original_data)
             self.filter_controls.update_statistics(stats)
 
@@ -120,15 +169,20 @@ class MainWindow:
             self.status_var.set("Error loading file")
 
     def _update_plot(self):
+        """Update the plot with current data"""
         if self.original_data is None:
             return
 
         self.ax.clear()
         
-        self.ax.plot(self.time_data, self.original_data, label='Original Signal', alpha=0.5)
+        # Plot original data
+        self.ax.plot(self.time_data, self.original_data, 
+                    label='Original Signal', alpha=0.5)
         
+        # Plot filtered data if available
         if self.filtered_data is not None:
-            self.ax.plot(self.time_data, self.filtered_data, label='Filtered Signal', linestyle='--')
+            self.ax.plot(self.time_data, self.filtered_data, 
+                        label='Filtered Signal', linestyle='--')
         
         self.ax.set_xlabel('Time (s)')
         self.ax.set_ylabel('Current (pA)')
@@ -140,9 +194,18 @@ class MainWindow:
         self.canvas.draw_idle()
 
     def _handle_control_event(self, event: Dict[str, Any]):
+        """Handle control panel events"""
         event_type = event.get('type', '')
 
-        if event_type == 'apply_filters':
+        if event_type == 'update_view':
+            self._update_view_mode(event.get('mode'))
+        elif event_type == 'event_detection':
+            self._handle_event_detection(event)
+        elif event_type == 'update_measurements':
+            self._update_measurements(event)
+        elif event_type == 'export':
+            self._handle_export(event.get('target'))
+        elif event_type == 'apply_filters':
             self._apply_filters(event.get('filters', {}))
         elif event_type == 'reset_view':
             self._reset_view()
@@ -153,6 +216,7 @@ class MainWindow:
             self._update_interval(event.get('start'), event.get('end'))
 
     def _apply_filters(self, filter_params: Dict[str, Any]):
+        """Apply selected filters to the data"""
         if self.original_data is None:
             messagebox.showwarning("Warning", "No data loaded")
             return
@@ -161,8 +225,10 @@ class MainWindow:
             self.status_var.set("Applying filters...")
             self.root.update()
 
+            # Start with original data
             self.filtered_data = self.original_data.copy()
 
+            # Apply Savitzky-Golay filter
             if filter_params['savgol']['enabled']:
                 self.filtered_data = self.filters['savgol'].filter(
                     self.filtered_data,
@@ -170,12 +236,14 @@ class MainWindow:
                     polyorder=filter_params['savgol']['polyorder']
                 )
 
+            # Apply FFT filter
             if filter_params['fft']['enabled']:
                 self.filtered_data = self.filters['fft'].filter(
                     self.filtered_data,
                     threshold=filter_params['fft']['threshold']
                 )
 
+            # Apply Butterworth filter
             if filter_params['butterworth']['enabled']:
                 self.filtered_data = self.filters['butterworth'].filter(
                     self.filtered_data,
@@ -184,6 +252,7 @@ class MainWindow:
                     fs=self.atf_handler.get_sampling_rate()
                 )
 
+            # Apply Adaptive filter
             if filter_params['adaptive']['enabled']:
                 self.filtered_data = self.filters['adaptive'].filter(
                     self.filtered_data,
@@ -192,12 +261,13 @@ class MainWindow:
                     learning_rate=filter_params['adaptive']['learning_rate']
                 )
 
+            # Update plot and statistics
             self._update_plot()
-            
             if self.filtered_data is not None:
                 stats = calculate_signal_metrics(self.filtered_data)
                 self.filter_controls.update_statistics(stats)
 
+            # Update pattern statistics if adaptive filter was used
             if filter_params['adaptive']['enabled']:
                 pattern_stats = self.filters['adaptive'].get_pattern_statistics()
                 self.filter_controls.update_pattern_statistics(pattern_stats)
@@ -209,6 +279,7 @@ class MainWindow:
             self.status_var.set("Error applying filters")
 
     def _update_interval(self, start: float, end: float):
+        """Update plot to show selected interval"""
         if self.time_data is None:
             return
 
@@ -216,11 +287,13 @@ class MainWindow:
         self.canvas.draw_idle()
 
     def _reset_view(self):
+        """Reset plot view to show all data"""
         if self.time_data is not None:
             self.ax.set_xlim(self.time_data[0], self.time_data[-1])
             self.canvas.draw_idle()
 
     def _save_filtered_data(self):
+        """Save filtered data to file"""
         if self.filtered_data is None:
             messagebox.showwarning("Warning", "No filtered data to save")
             return
@@ -232,14 +305,19 @@ class MainWindow:
             )
 
             if filepath:
-                data = np.column_stack((self.time_data, self.original_data, self.filtered_data))
-                np.savetxt(filepath, data, delimiter=',', header='Time,Original,Filtered', comments='')
+                data = np.column_stack((self.time_data, 
+                                      self.original_data, 
+                                      self.filtered_data))
+                np.savetxt(filepath, data, delimiter=',',
+                          header='Time,Original,Filtered',
+                          comments='')
                 messagebox.showinfo("Success", "Data saved successfully")
 
         except Exception as e:
             messagebox.showerror("Error", f"Error saving data: {str(e)}")
 
     def _show_statistics_window(self):
+        """Show detailed statistics window"""
         if self.original_data is None:
             messagebox.showwarning("Warning", "No data loaded")
             return
@@ -248,12 +326,16 @@ class MainWindow:
         stats_window.title("Signal Statistics")
         stats_window.geometry("400x300")
 
+        # Calculate statistics
         original_stats = calculate_signal_metrics(self.original_data)
-        filtered_stats = calculate_signal_metrics(self.filtered_data) if self.filtered_data is not None else None
+        filtered_stats = (calculate_signal_metrics(self.filtered_data) 
+                        if self.filtered_data is not None else None)
 
+        # Create text widget
         text = tk.Text(stats_window, wrap=tk.WORD, padx=10, pady=10)
         text.pack(fill='both', expand=True)
 
+        # Add statistics
         text.insert('end', "Original Signal Statistics:\n\n")
         for key, value in original_stats.items():
             text.insert('end', f"{key}: {value:.3f}\n")
@@ -310,6 +392,291 @@ class MainWindow:
 
         except Exception as e:
             messagebox.showerror("Error", f"Error importing settings: {str(e)}")
+    
+    def _update_view_mode(self, mode: str):
+        """Handle view mode changes"""
+        if self.original_data is None:
+            return
+
+        self.ax.clear()
+        
+        if mode == "overlay":
+            self._show_overlay_view()
+        elif mode == "sidebyside":
+            self._show_sidebyside_view()
+        elif mode == "difference":
+            self._show_difference_view()
+            
+        self.canvas.draw_idle()
+
+    def _show_overlay_view(self):
+        """Show original and filtered signals overlaid"""
+        self.ax.plot(self.time_data, self.original_data, 
+                    label='Original Signal', alpha=0.5)
+        
+        if self.filtered_data is not None:
+            self.ax.plot(self.time_data, self.filtered_data, 
+                        label='Filtered Signal', linestyle='--')
+        
+        self.ax.set_xlabel('Time (s)')
+        self.ax.set_ylabel('Current (pA)')
+        self.ax.set_title('Signal Analysis - Overlay View')
+        self.ax.grid(True)
+        self.ax.legend()
+
+    def _show_sidebyside_view(self):
+        """Show original and filtered signals side by side"""
+        # Clear current axis and create two subplots
+        self.fig.clear()
+        ax1 = self.fig.add_subplot(211)
+        ax2 = self.fig.add_subplot(212)
+        
+        # Plot original signal
+        ax1.plot(self.time_data, self.original_data, label='Original Signal')
+        ax1.set_title('Original Signal')
+        ax1.set_xlabel('Time (s)')
+        ax1.set_ylabel('Current (pA)')
+        ax1.grid(True)
+        
+        # Plot filtered signal if available
+        if self.filtered_data is not None:
+            ax2.plot(self.time_data, self.filtered_data, 
+                    label='Filtered Signal', color='orange')
+        ax2.set_title('Filtered Signal')
+        ax2.set_xlabel('Time (s)')
+        ax2.set_ylabel('Current (pA)')
+        ax2.grid(True)
+        
+        self.fig.tight_layout()
+
+    def _show_difference_view(self):
+        """Show difference between original and filtered signals"""
+        if self.filtered_data is None:
+            self.ax.plot(self.time_data, self.original_data, 
+                        label='Original Signal')
+        else:
+            difference = self.original_data - self.filtered_data
+            self.ax.plot(self.time_data, difference, 
+                        label='Difference', color='red')
+            
+            self.ax.set_xlabel('Time (s)')
+            self.ax.set_ylabel('Difference (pA)')
+            self.ax.set_title('Signal Difference (Original - Filtered)')
+            self.ax.grid(True)
+            self.ax.legend()
+
+    def _handle_event_detection(self, event: Dict[str, Any]):
+        """Handle event detection"""
+        if not self.original_data is not None:
+            return
+            
+        if event['enabled']:
+            events = self._detect_events(event['threshold'])
+            self.filter_controls.update_event_statistics(events)
+            self._plot_events(events)
+        else:
+            self._clear_event_markers()
+
+    def _detect_events(self, threshold: float) -> Dict[str, Any]:
+        """Detect events in the signal"""
+        if self.filtered_data is not None:
+            data = self.filtered_data
+        else:
+            data = self.original_data
+            
+        # Calculate baseline and std
+        baseline = np.median(data)
+        noise_std = np.std(data - baseline)
+        
+        # Find events (peaks above threshold * std)
+        from scipy.signal import find_peaks
+        peaks, properties = find_peaks(data, height=baseline + threshold * noise_std,
+                                     width=1, distance=10)
+        
+        # Calculate event properties
+        events = {
+            'event_count': len(peaks),
+            'peak_indices': peaks,
+            'peak_heights': properties['peak_heights'],
+            'avg_amplitude': np.mean(properties['peak_heights']) if len(peaks) > 0 else 0,
+            'baseline': baseline,
+            'noise_std': noise_std
+        }
+        
+        return events
+
+    def _plot_events(self, events: Dict[str, Any]):
+        """Plot detected events"""
+        if hasattr(self, 'event_markers'):
+            for marker in self.event_markers:
+                marker.remove()
+                
+        self.event_markers = []
+        
+        # Plot peak markers
+        marker = self.ax.plot(self.time_data[events['peak_indices']], 
+                            events['peak_heights'], 'ro', 
+                            label='Detected Events')[0]
+        self.event_markers.append(marker)
+        
+        # Plot baseline
+        baseline = self.ax.axhline(y=events['baseline'], color='g', 
+                                 linestyle='--', label='Baseline')
+        self.event_markers.append(baseline)
+        
+        self.ax.legend()
+        self.canvas.draw_idle()
+
+    def _clear_event_markers(self):
+        """Clear event markers from plot"""
+        if hasattr(self, 'event_markers'):
+            for marker in self.event_markers:
+                marker.remove()
+            self.event_markers = []
+            self.canvas.draw_idle()
+
+    def _update_measurements(self, event: Dict[str, Any]):
+        """Handle measurement updates"""
+        if self.original_data is None:
+            return
+            
+        if event['show_peaks']:
+            self._show_peak_markers()
+        else:
+            self._hide_peak_markers()
+            
+        if event['show_baseline']:
+            self._show_baseline()
+        else:
+            self._hide_baseline()
+            
+        self.canvas.draw_idle()
+
+    def _show_peak_markers(self):
+        """Show peak markers on the plot"""
+        if self.filtered_data is not None:
+            data = self.filtered_data
+        else:
+            data = self.original_data
+            
+        from scipy.signal import find_peaks
+        peaks, _ = find_peaks(data, height=np.mean(data), distance=10)
+        
+        if hasattr(self, 'peak_markers'):
+            self._hide_peak_markers()
+            
+        self.peak_markers = self.ax.plot(self.time_data[peaks], data[peaks], 
+                                       'ro', label='Peaks')[0]
+        self.ax.legend()
+
+    def _hide_peak_markers(self):
+        """Hide peak markers"""
+        if hasattr(self, 'peak_markers'):
+            self.peak_markers.remove()
+            delattr(self, 'peak_markers')
+            self.ax.legend()
+
+    def _show_baseline(self):
+        """Show baseline on the plot"""
+        if self.filtered_data is not None:
+            data = self.filtered_data
+        else:
+            data = self.original_data
+            
+        baseline = np.median(data)
+        
+        if hasattr(self, 'baseline_line'):
+            self._hide_baseline()
+            
+        self.baseline_line = self.ax.axhline(y=baseline, color='g', 
+                                           linestyle='--', label='Baseline')
+        self.ax.legend()
+
+    def _hide_baseline(self):
+        """Hide baseline"""
+        if hasattr(self, 'baseline_line'):
+            self.baseline_line.remove()
+            delattr(self, 'baseline_line')
+            self.ax.legend()
+
+    def _handle_export(self, target: str):
+        """Handle export requests"""
+        if self.original_data is None:
+            messagebox.showwarning("Warning", "No data to export")
+            return
+            
+        if target == 'data':
+            self._export_data()
+        elif target == 'statistics':
+            self._export_statistics()
+        elif target == 'plot':
+            self._export_plot()
+
+    def _export_data(self):
+        """Export data to CSV"""
+        filepath = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        
+        if filepath:
+            try:
+                data = {
+                    'Time': self.time_data,
+                    'Original': self.original_data
+                }
+                
+                if self.filtered_data is not None:
+                    data['Filtered'] = self.filtered_data
+                    
+                import pandas as pd
+                df = pd.DataFrame(data)
+                df.to_csv(filepath, index=False)
+                messagebox.showinfo("Success", "Data exported successfully")
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to export data: {str(e)}")
+
+    def _export_statistics(self):
+        """Export statistics to JSON"""
+        filepath = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+        )
+        
+        if filepath:
+            try:
+                stats = {
+                    'original': calculate_signal_metrics(self.original_data)
+                }
+                
+                if self.filtered_data is not None:
+                    stats['filtered'] = calculate_signal_metrics(self.filtered_data)
+                    
+                with open(filepath, 'w') as f:
+                    json.dump(stats, f, indent=4)
+                    
+                messagebox.showinfo("Success", "Statistics exported successfully")
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to export statistics: {str(e)}")
+
+    def _export_plot(self):
+        """Export plot as image"""
+        filepath = filedialog.asksaveasfilename(
+            defaultextension=".png",
+            filetypes=[("PNG files", "*.png"), 
+                      ("PDF files", "*.pdf"),
+                      ("All files", "*.*")]
+        )
+        
+        if filepath:
+            try:
+                self.fig.savefig(filepath, dpi=300, bbox_inches='tight')
+                messagebox.showinfo("Success", "Plot exported successfully")
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to export plot: {str(e)}")
 
     def _show_documentation(self):
         """Show documentation window"""
@@ -332,6 +699,9 @@ class MainWindow:
 
         # Documentation text
         doc_text = """
+    
+            
+
 ChaMo v2 - Channel Analysis Tool
 
 This tool provides advanced signal processing capabilities for analyzing ion channel recordings.
@@ -438,6 +808,8 @@ All rights reserved.
             self._show_error("No data loaded")
             return False
         return True
+
+
 
 if __name__ == "__main__":
     root = tk.Tk()

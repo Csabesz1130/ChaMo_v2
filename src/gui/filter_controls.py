@@ -58,16 +58,32 @@ class FilterControls(ttk.LabelFrame):
         self.overlap_value = tk.StringVar(value="0.50")
         self.learning_rate_value = tk.StringVar(value="0.10")
 
-        # Interval selection
+        # Interval selection variables
         self.use_interval = tk.BooleanVar(value=False)
         self.interval_start = tk.DoubleVar(value=0.0)
         self.interval_end = tk.DoubleVar(value=1.0)
         self.interval_start_value = tk.StringVar(value="0.00")
         self.interval_end_value = tk.StringVar(value="1.00")
+        self.start_scale = None  # Initialize as None
+        self.end_scale = None    # Initialize as None
 
         # Statistics display
         self.stats_text = tk.StringVar(value="No data loaded")
         self.pattern_stats = tk.StringVar(value="No patterns learned")
+
+        # View mode variables
+        self.view_mode = tk.StringVar(value="overlay")
+        
+        # Event detection variables
+        self.use_event_detection = tk.BooleanVar(value=False)
+        self.event_threshold = tk.DoubleVar(value=2.0)
+        
+        # Measurement variables
+        self.show_peaks = tk.BooleanVar(value=False)
+        self.show_baseline = tk.BooleanVar(value=False)
+        
+        # Initialize statistics text widget
+        self.stats_text = None  # Will be created in _create_statistics_panel
 
 
     def _create_export_controls(self):
@@ -80,6 +96,132 @@ class FilterControls(ttk.LabelFrame):
                 command=self._export_stats).pack(fill='x', pady=2)
         ttk.Button(export_frame, text="Export Plot...", 
                 command=self._export_plot).pack(fill='x', pady=2)
+        
+    def _update_view(self, *args):
+        """Handle view mode changes"""
+        view_params = {
+            'type': 'update_view',
+            'mode': self.view_mode.get()
+        }
+        self.callback(view_params)
+
+    def _handle_event_detection(self, *args):
+        """Handle event detection changes"""
+        if self.use_event_detection.get():
+            event_params = {
+                'type': 'event_detection',
+                'enabled': True,
+                'threshold': self.event_threshold.get()
+            }
+            self.callback(event_params)
+        else:
+            self.callback({'type': 'event_detection', 'enabled': False})
+
+    def _handle_measurement_changes(self, *args):
+        """Handle measurement display changes"""
+        measure_params = {
+            'type': 'update_measurements',
+            'show_peaks': self.show_peaks.get(),
+            'show_baseline': self.show_baseline.get()
+        }
+        self.callback(measure_params)
+
+    def _export_data(self):
+        """Handle data export"""
+        export_params = {
+            'type': 'export',
+            'target': 'data'
+        }
+        self.callback(export_params)
+
+    def _export_stats(self):
+        """Handle statistics export"""
+        export_params = {
+            'type': 'export',
+            'target': 'statistics'
+        }
+        self.callback(export_params)
+
+    def _export_plot(self):
+        """Handle plot export"""
+        export_params = {
+            'type': 'export',
+            'target': 'plot'
+        }
+        self.callback(export_params)
+
+    def update_event_statistics(self, event_stats: Dict[str, Any]):
+        """Update event statistics display"""
+        if not event_stats:
+            return
+            
+        stats_text = (
+            f"Event Analysis:\n"
+            f"Events detected: {event_stats.get('event_count', 0)}\n"
+            f"Average duration: {event_stats.get('avg_duration', 0):.2f} ms\n"
+            f"Average amplitude: {event_stats.get('avg_amplitude', 0):.2f} pA\n"
+            f"Peak frequency: {event_stats.get('frequency', 0):.2f} Hz\n"
+        )
+        
+        # Insert into stats text widget
+        self.stats_text.insert('end', stats_text + "\n")
+        self.stats_text.see('end')
+
+    def update_measurement_display(self, measurements: Dict[str, Any]):
+        """Update measurement statistics display"""
+        if not measurements:
+            return
+            
+        measure_text = (
+            f"Measurements:\n"
+            f"Peak count: {measurements.get('peak_count', 0)}\n"
+            f"Mean peak amplitude: {measurements.get('mean_peak_amplitude', 0):.2f} pA\n"
+            f"Baseline mean: {measurements.get('baseline_mean', 0):.2f} pA\n"
+            f"Baseline std: {measurements.get('baseline_std', 0):.2f} pA\n"
+        )
+        
+        # Insert into stats text widget
+        self.stats_text.insert('end', measure_text + "\n")
+        self.stats_text.see('end')
+
+    def clear_statistics(self):
+        """Clear statistics display"""
+        self.stats_text.delete('1.0', 'end')
+
+    def _bind_events(self):
+        """Bind all control events"""
+        # View controls
+        self.view_mode.trace_add('write', self._update_view)
+        
+        # Event detection controls
+        self.use_event_detection.trace_add('write', self._handle_event_detection)
+        self.event_threshold.trace_add('write', self._handle_event_detection)
+        
+        # Measurement controls
+        self.show_peaks.trace_add('write', self._handle_measurement_changes)
+        self.show_baseline.trace_add('write', self._handle_measurement_changes)
+
+    def _create_real_time_display(self):
+        """Create real-time measurement display"""
+        realtime_frame = ttk.LabelFrame(self.view_frame, text="Real-time Measurements")
+        realtime_frame.pack(fill='x', padx=5, pady=5)
+        
+        self.current_value = tk.StringVar(value="Current: -- pA")
+        self.baseline_value = tk.StringVar(value="Baseline: -- pA")
+        self.peak_value = tk.StringVar(value="Last Peak: -- pA")
+        
+        ttk.Label(realtime_frame, textvariable=self.current_value).pack(anchor='w')
+        ttk.Label(realtime_frame, textvariable=self.baseline_value).pack(anchor='w')
+        ttk.Label(realtime_frame, textvariable=self.peak_value).pack(anchor='w')
+
+    def update_real_time_values(self, values: Dict[str, float]):
+        """Update real-time measurement display"""
+        if 'current' in values:
+            self.current_value.set(f"Current: {values['current']:.2f} pA")
+        if 'baseline' in values:
+            self.baseline_value.set(f"Baseline: {values['baseline']:.2f} pA")
+        if 'peak' in values:
+            self.peak_value.set(f"Last Peak: {values['peak']:.2f} pA")
 
     def _create_traditional_controls(self):
         """Create controls for traditional filters"""
@@ -280,17 +422,26 @@ class FilterControls(ttk.LabelFrame):
                  width=8).pack(side='right')
 
     def _create_statistics_panel(self):
+        """Create statistics display panel"""
         stats_frame = ttk.LabelFrame(self, text="Statistics")
         stats_frame.pack(fill='x', padx=5, pady=5)
         
-        # Create scrolled text widget for detailed statistics
-        self.stats_text = tk.Text(stats_frame, height=6, wrap='word')
-        scrollbar = ttk.Scrollbar(stats_frame, orient='vertical', 
+        # Create text widget with scrollbar
+        text_frame = ttk.Frame(stats_frame)
+        text_frame.pack(fill='both', expand=True, padx=5, pady=5)
+        
+        self.stats_text = tk.Text(text_frame, height=6, width=40, wrap='word')
+        scrollbar = ttk.Scrollbar(text_frame, orient='vertical', 
                                 command=self.stats_text.yview)
+        
         self.stats_text.configure(yscrollcommand=scrollbar.set)
         
         self.stats_text.pack(side='left', fill='both', expand=True)
         scrollbar.pack(side='right', fill='y')
+        
+        # Initial text
+        self.stats_text.insert('1.0', "No data loaded")
+        self.stats_text.configure(state='disabled')  # Make read-only
 
     def _create_buttons(self):
         """Create control buttons"""
@@ -310,10 +461,16 @@ class FilterControls(ttk.LabelFrame):
 
     def _on_interval_toggle(self):
         """Handle interval selection toggle"""
-        if self.use_interval.get():
-            self.callback({'type': 'interval_toggle', 'enabled': True})
-        else:
-            self.callback({'type': 'interval_toggle', 'enabled': False})
+        try:
+            if self.use_interval.get():
+                # Ensure scales are properly initialized
+                if self.start_scale is not None and self.end_scale is not None:
+                    self.callback({'type': 'interval_toggle', 'enabled': True})
+            else:
+                self.callback({'type': 'interval_toggle', 'enabled': False})
+        except Exception as e:
+            print(f"Error in interval toggle: {e}")
+            self.use_interval.set(False)
 
     def _update_interval_display(self, _=None):
         """Update interval display and notify callback"""
@@ -502,18 +659,22 @@ class FilterControls(ttk.LabelFrame):
     def update_statistics(self, stats: Dict[str, Any]):
         """Update statistics display"""
         if not stats:
-            self.stats_text.set("No data loaded")
-            return
-
-        stats_text = (
-            f"Signal Statistics:\n"
-            f"Mean: {stats.get('mean', 0):.2f}\n"
-            f"Std: {stats.get('std', 0):.2f}\n"
-            f"RMS: {stats.get('rms', 0):.2f}\n"
-            f"Peak-to-Peak: {stats.get('peak_to_peak', 0):.2f}\n"
-            f"SNR: {stats.get('snr', 0):.2f} dB"
-        )
-        self.stats_text.set(stats_text)
+            stats_text = "No data loaded"
+        else:
+            stats_text = (
+                f"Signal Statistics:\n"
+                f"Mean: {stats.get('mean', 0):.2f}\n"
+                f"Std: {stats.get('std', 0):.2f}\n"
+                f"RMS: {stats.get('rms', 0):.2f}\n"
+                f"Peak-to-Peak: {stats.get('peak_to_peak', 0):.2f}\n"
+                f"SNR: {stats.get('snr', 0):.2f} dB"
+            )
+        
+        # Update text widget
+        self.stats_text.configure(state='normal')  # Allow editing
+        self.stats_text.delete('1.0', 'end')
+        self.stats_text.insert('1.0', stats_text)
+        self.stats_text.configure(state='disabled')  # Make read-only again
 
     def update_pattern_statistics(self, stats: Dict[str, Any]):
         """Update pattern statistics display"""
@@ -530,9 +691,23 @@ class FilterControls(ttk.LabelFrame):
 
     def set_time_range(self, start: float, end: float):
         """Set the available time range for interval selection"""
-        self.start_scale.configure(to=end)
-        self.end_scale.configure(to=end)
-        if not self.use_interval.get():
-            self.interval_start.set(start)
-            self.interval_end.set(end)
-            self._update_interval_display()
+        try:
+            # Update scale ranges
+            if hasattr(self, 'start_scale') and self.start_scale is not None:
+                self.start_scale.configure(to=end)
+                self.end_scale.configure(to=end)
+
+            # Update values if interval selection is not active
+            if not self.use_interval.get():
+                self.interval_start.set(start)
+                self.interval_end.set(end)
+                self.interval_start_value.set(f"{start:.2f}")
+                self.interval_end_value.set(f"{end:.2f}")
+
+        except Exception as e:
+            print(f"Error setting time range: {e}")
+            # Try to recover by resetting values
+            self.interval_start.set(0.0)
+            self.interval_end.set(1.0)
+            self.interval_start_value.set("0.00")
+            self.interval_end_value.set("1.00")
