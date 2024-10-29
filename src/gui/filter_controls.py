@@ -225,81 +225,97 @@ class FilterControls(ttk.LabelFrame):
 
     def _create_traditional_controls(self):
         """Create controls for traditional filters"""
+        # Main traditional filters frame
         traditional_frame = ttk.LabelFrame(self, text="Traditional Filters")
-        traditional_frame.pack(fill='x', padx=5, pady=5)
+        traditional_frame.pack(fill='x', padx=5, pady=5, ipadx=5, ipady=5)
 
-        # Savitzky-Golay controls
-        savgol_frame = ttk.LabelFrame(traditional_frame, text="Savitzky-Golay Filter")
+        # Savitzky-Golay Filter
+        savgol_frame = ttk.LabelFrame(traditional_frame, text="Savitzky-Golay Filter", relief="solid")
         savgol_frame.pack(fill='x', padx=5, pady=5)
         
-        ttk.Checkbutton(savgol_frame, text="Enable", 
-                       variable=self.use_savgol).pack(pady=2)
+        # Enable checkbox in its own frame
+        enable_frame = ttk.Frame(savgol_frame)
+        enable_frame.pack(fill='x', padx=5, pady=2)
+        ttk.Checkbutton(enable_frame, text="Enable Savitzky-Golay Filter", 
+                    variable=self.use_savgol,
+                    command=self._apply_filters).pack(anchor='w')
         
         # Window length control
         window_frame = ttk.Frame(savgol_frame)
         window_frame.pack(fill='x', padx=5, pady=2)
-        ttk.Label(window_frame, text="Window Length:").pack(side='left')
+        ttk.Label(window_frame, text="Window Length:", width=15).pack(side='left')
         ttk.Scale(window_frame, from_=5, to=101, variable=self.savgol_window,
-                 orient='horizontal', 
-                 command=lambda v: self.savgol_window_value.set(f"{float(v):.0f}")
-                 ).pack(side='left', fill='x', expand=True)
+                orient='horizontal',
+                command=lambda v: self._update_savgol_window(float(v))
+                ).pack(side='left', fill='x', expand=True)
         ttk.Label(window_frame, textvariable=self.savgol_window_value,
-                 width=5).pack(side='right')
+                width=6).pack(side='right')
 
         # Polynomial order control
         poly_frame = ttk.Frame(savgol_frame)
         poly_frame.pack(fill='x', padx=5, pady=2)
-        ttk.Label(poly_frame, text="Polynomial Order:").pack(side='left')
+        ttk.Label(poly_frame, text="Polynomial Order:", width=15).pack(side='left')
         ttk.Scale(poly_frame, from_=2, to=5, variable=self.savgol_polyorder,
-                 orient='horizontal',
-                 command=lambda v: self.savgol_polyorder_value.set(f"{float(v):.0f}")
-                 ).pack(side='left', fill='x', expand=True)
+                orient='horizontal',
+                command=lambda v: self._update_savgol_poly(float(v))
+                ).pack(side='left', fill='x', expand=True)
         ttk.Label(poly_frame, textvariable=self.savgol_polyorder_value,
-                 width=5).pack(side='right')
+                width=6).pack(side='right')
 
-        # FFT controls
-        fft_frame = ttk.LabelFrame(traditional_frame, text="FFT Filter")
+        # FFT Filter
+        fft_frame = ttk.LabelFrame(traditional_frame, text="FFT Filter", relief="solid")
         fft_frame.pack(fill='x', padx=5, pady=5)
         
-        ttk.Checkbutton(fft_frame, text="Enable", 
-                       variable=self.use_fft).pack(pady=2)
+        # Enable checkbox in its own frame
+        enable_frame = ttk.Frame(fft_frame)
+        enable_frame.pack(fill='x', padx=5, pady=2)
+        ttk.Checkbutton(enable_frame, text="Enable FFT Filter",
+                    variable=self.use_fft,
+                    command=self._apply_filters).pack(anchor='w')
         
+        # Threshold control
         thresh_frame = ttk.Frame(fft_frame)
         thresh_frame.pack(fill='x', padx=5, pady=2)
-        ttk.Label(thresh_frame, text="Threshold:").pack(side='left')
+        ttk.Label(thresh_frame, text="Threshold:", width=15).pack(side='left')
         ttk.Scale(thresh_frame, from_=0.01, to=1.0, variable=self.fft_threshold,
-                 orient='horizontal',
-                 command=lambda v: self.fft_threshold_value.set(f"{float(v):.2f}")
-                 ).pack(side='left', fill='x', expand=True)
+                orient='horizontal',
+                command=lambda v: self._update_fft_threshold(float(v))
+                ).pack(side='left', fill='x', expand=True)
         ttk.Label(thresh_frame, textvariable=self.fft_threshold_value,
-                 width=5).pack(side='right')
+                width=6).pack(side='right')
 
-        # Butterworth controls
-        butter_frame = ttk.LabelFrame(traditional_frame, text="Butterworth Filter")
+        # Butterworth Filter
+        butter_frame = ttk.LabelFrame(traditional_frame, text="Butterworth Filter", relief="solid")
         butter_frame.pack(fill='x', padx=5, pady=5)
         
-        ttk.Checkbutton(butter_frame, text="Enable", 
-                       variable=self.use_butter).pack(pady=2)
+        # Enable checkbox in its own frame
+        enable_frame = ttk.Frame(butter_frame)
+        enable_frame.pack(fill='x', padx=5, pady=2)
+        ttk.Checkbutton(enable_frame, text="Enable Butterworth Filter",
+                    variable=self.use_butter,
+                    command=self._apply_filters).pack(anchor='w')
         
+        # Cutoff frequency control
         cutoff_frame = ttk.Frame(butter_frame)
         cutoff_frame.pack(fill='x', padx=5, pady=2)
-        ttk.Label(cutoff_frame, text="Cutoff Frequency:").pack(side='left')
+        ttk.Label(cutoff_frame, text="Cutoff Frequency:", width=15).pack(side='left')
         ttk.Scale(cutoff_frame, from_=0.01, to=1.0, variable=self.butter_cutoff,
-                 orient='horizontal',
-                 command=lambda v: self.butter_cutoff_value.set(f"{float(v):.2f}")
-                 ).pack(side='left', fill='x', expand=True)
+                orient='horizontal',
+                command=lambda v: self._update_butter_cutoff(float(v))
+                ).pack(side='left', fill='x', expand=True)
         ttk.Label(cutoff_frame, textvariable=self.butter_cutoff_value,
-                 width=5).pack(side='right')
+                width=6).pack(side='right')
 
+        # Order control
         order_frame = ttk.Frame(butter_frame)
         order_frame.pack(fill='x', padx=5, pady=2)
-        ttk.Label(order_frame, text="Order:").pack(side='left')
+        ttk.Label(order_frame, text="Filter Order:", width=15).pack(side='left')
         ttk.Scale(order_frame, from_=1, to=10, variable=self.butter_order,
-                 orient='horizontal',
-                 command=lambda v: self.butter_order_value.set(f"{float(v):.0f}")
-                 ).pack(side='left', fill='x', expand=True)
+                orient='horizontal',
+                command=lambda v: self._update_butter_order(float(v))
+                ).pack(side='left', fill='x', expand=True)
         ttk.Label(order_frame, textvariable=self.butter_order_value,
-                 width=5).pack(side='right')
+                width=6).pack(side='right')
         
     def _create_view_controls(self):
         # View mode controls
@@ -442,6 +458,58 @@ class FilterControls(ttk.LabelFrame):
         # Initial text
         self.stats_text.insert('1.0', "No data loaded")
         self.stats_text.configure(state='disabled')  # Make read-only
+
+    def _update_savgol_window(self, value):
+        """Update Savitzky-Golay window value"""
+        self.savgol_window_value.set(f"{value:.0f}")
+        if self.use_savgol.get():
+            self._apply_filters()
+
+    def _update_savgol_poly(self, value):
+        """Update Savitzky-Golay polynomial order value"""
+        self.savgol_polyorder_value.set(f"{value:.0f}")
+        if self.use_savgol.get():
+            self._apply_filters()
+
+    def _update_fft_threshold(self, value):
+        """Update FFT threshold value"""
+        self.fft_threshold_value.set(f"{value:.2f}")
+        if self.use_fft.get():
+            self._apply_filters()
+
+    def _update_butter_cutoff(self, value):
+        """Update Butterworth cutoff value"""
+        self.butter_cutoff_value.set(f"{value:.2f}")
+        if self.use_butter.get():
+            self._apply_filters()
+
+    def _update_butter_order(self, value):
+        """Update Butterworth order value"""
+        self.butter_order_value.set(f"{value:.0f}")
+        if self.use_butter.get():
+            self._apply_filters()
+
+    def _apply_filters(self):
+        """Trigger filter application"""
+        self.callback({
+            'type': 'apply_filters',
+            'filters': {
+                'savgol': {
+                    'enabled': self.use_savgol.get(),
+                    'window_length': self.savgol_window.get(),
+                    'polyorder': self.savgol_polyorder.get()
+                },
+                'fft': {
+                    'enabled': self.use_fft.get(),
+                    'threshold': self.fft_threshold.get()
+                },
+                'butterworth': {
+                    'enabled': self.use_butter.get(),
+                    'cutoff': self.butter_cutoff.get(),
+                    'order': self.butter_order.get()
+                }
+            }
+        })
 
     def _create_buttons(self):
         """Create control buttons"""

@@ -6,3 +6,29 @@
 2024-10-28 23:46:53,852 - src.main - INFO - Application started successfully
 2024-10-28 23:51:22,619 - src.main - INFO - Starting ChaMo_v2...
 2024-10-28 23:51:22,804 - src.main - INFO - Application started successfully
+2024-10-29 12:46:30,930 - src.main - INFO - Starting ChaMo_v2...
+2024-10-29 12:46:31,555 - src.main - INFO - Application started successfully
+2024-10-29 12:53:19,705 - src.main - INFO - Starting ChaMo_v2...
+2024-10-29 12:53:19,902 - src.main - INFO - Application started successfully
+2024-10-29 13:04:15,667 - src.main - INFO - Starting ChaMo_v2...
+2024-10-29 13:04:24,515 - src.main - ERROR - Application error: 'MainWindow' object has no attribute '_load_file'
+Traceback (most recent call last):
+  File "C:\Users\Balogh Csaba\Downloads\ChaMo_v2\src\main.py", line 26, in main
+    app = MainWindow(root)
+          ^^^^^^^^^^^^^^^^
+  File "C:\Users\Balogh Csaba\Downloads\ChaMo_v2\src\gui\main_window.py", line 50, in __init__
+    self._create_menu()
+  File "C:\Users\Balogh Csaba\Downloads\ChaMo_v2\src\gui\main_window.py", line 109, in _create_menu
+    file_menu.add_command(label="Open", command=self._load_file)
+                                                ^^^^^^^^^^^^^^^
+AttributeError: 'MainWindow' object has no attribute '_load_file'
+2024-10-29 13:08:14,948 - src.main - INFO - Starting ChaMo_v2...
+2024-10-29 13:08:15,065 - src.main - ERROR - Application error: 'MainWindow' object has no attribute '_setup_plot'
+Traceback (most recent call last):
+  File "C:\Users\Balogh Csaba\Downloads\ChaMo_v2\src\main.py", line 26, in main
+    app = MainWindow(root)
+          ^^^^^^^^^^^^^^^^
+  File "C:\Users\Balogh Csaba\Downloads\ChaMo_v2\src\gui\main_window.py", line 47, in __init__
+    self._setup_plot()
+    ^^^^^^^^^^^^^^^^
+AttributeError: 'MainWindow' object has no attribute '_setup_plot'

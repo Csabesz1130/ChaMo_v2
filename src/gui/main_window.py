@@ -22,6 +22,7 @@ from .filter_controls import FilterControls
 
 class MainWindow:
     def __init__(self, root):
+        """Initialize the main window"""
         self.root = root
         self.root.title("ChaMo v2 - Channel Analysis Tool")
         self.root.state('zoomed')  # Start maximized
@@ -40,14 +41,137 @@ class MainWindow:
             'adaptive': AdaptivePatternFilter()
         }
 
-        # Create main layout
-        self._create_menu()
+        # Create main layout first
+        self._setup_menu()  # Changed from _create_menu to _setup_menu
         self._create_main_layout()
         self._setup_plot()
 
         # Status bar
         self.status_var = tk.StringVar(value="Ready")
         self._create_status_bar()
+
+        # Initialize keyboard shortcuts
+        self._setup_keyboard_shortcuts()
+
+    def _setup_menu(self):
+        """Setup the main menu bar"""
+        self.menubar = tk.Menu(self.root)
+        self.root.config(menu=self.menubar)
+
+        # File menu
+        self.file_menu = tk.Menu(self.menubar, tearoff=0)
+        self.menubar.add_cascade(label="File", menu=self.file_menu)
+        self.file_menu.add_command(label="Open File...", 
+                                command=lambda: self._load_file(),
+                                accelerator="Ctrl+O")
+        self.file_menu.add_command(label="Save Filtered Data...", 
+                                command=lambda: self._save_filtered_data(),
+                                accelerator="Ctrl+S")
+        self.file_menu.add_separator()
+        self.file_menu.add_command(label="Exit", 
+                                command=self.root.quit,
+                                accelerator="Esc")
+
+        # View menu
+        self.view_menu = tk.Menu(self.menubar, tearoff=0)
+        self.menubar.add_cascade(label="View", menu=self.view_menu)
+        self.view_menu.add_command(label="Reset View", 
+                                command=lambda: self._reset_view(),
+                                accelerator="Ctrl+R")
+        self.view_menu.add_command(label="Show Statistics", 
+                                command=lambda: self._show_statistics_window())
+
+        # Tools menu
+        self.tools_menu = tk.Menu(self.menubar, tearoff=0)
+        self.menubar.add_cascade(label="Tools", menu=self.tools_menu)
+        self.tools_menu.add_command(label="Batch Process", 
+                                command=lambda: self._show_batch_process())
+        self.tools_menu.add_command(label="Export Settings", 
+                                command=lambda: self._export_settings())
+        self.tools_menu.add_command(label="Import Settings", 
+                                command=lambda: self._import_settings())
+
+        # Help menu
+        self.help_menu = tk.Menu(self.menubar, tearoff=0)
+        self.menubar.add_cascade(label="Help", menu=self.help_menu)
+        self.help_menu.add_command(label="Documentation", 
+                                command=lambda: self._show_documentation())
+        self.help_menu.add_command(label="About", 
+                                command=lambda: self._show_about())
+        
+    def _load_file(self, event=None):
+        """Load an ATF file"""
+        try:
+            filepath = filedialog.askopenfilename(
+                title="Select ATF file",
+                filetypes=[("ATF files", "*.atf"), ("All files", "*.*")]
+            )
+            
+            if not filepath:
+                return
+
+            self.status_var.set(f"Loading {Path(filepath).name}...")
+            self.root.update()
+
+            # Load ATF file
+            self.atf_handler = ATFHandler(filepath)
+            if not self.atf_handler.load_atf():
+                raise ValueError("Failed to load ATF file")
+
+            # Get data
+            self.time_data = self.atf_handler.get_time_data()
+            self.original_data = self.atf_handler.get_current_data()
+            self.filtered_data = None
+
+            # Update plot
+            self._update_plot()
+            
+            # Update controls
+            if hasattr(self, 'filter_controls'):
+                self.filter_controls.set_time_range(
+                    self.time_data[0], 
+                    self.time_data[-1]
+                )
+                
+                # Update statistics
+                stats = calculate_signal_metrics(self.original_data)
+                self.filter_controls.update_statistics(stats)
+
+            self.status_var.set("File loaded successfully")
+            return True
+
+        except Exception as e:
+            self.status_var.set(f"Error loading file: {str(e)}")
+            messagebox.showerror("Error", f"Error loading file: {str(e)}")
+            return False
+
+    def _setup_keyboard_shortcuts(self):
+        """Setup keyboard shortcuts"""
+        self.root.bind('<Control-o>', lambda e: self._load_file())
+        self.root.bind('<Control-s>', lambda e: self._save_filtered_data())
+        self.root.bind('<Control-r>', lambda e: self._reset_view())
+        self.root.bind('<Escape>', lambda e: self.root.quit())
+        # Add more shortcuts
+        self.root.bind('<Control-z>', lambda e: self._undo_last_action())
+        self.root.bind('<Control-y>', lambda e: self._redo_last_action())
+        self.root.bind('<space>', lambda e: self._toggle_interval_selection())
+
+    # Add these utility methods
+    def _undo_last_action(self):
+        """Undo last filter operation"""
+        # Implement undo functionality
+        pass
+
+    def _redo_last_action(self):
+        """Redo last undone operation"""
+        # Implement redo functionality
+        pass
+
+    def _toggle_interval_selection(self):
+        """Toggle interval selection mode"""
+        if hasattr(self, 'filter_controls'):
+            current = self.filter_controls.use_interval.get()
+            self.filter_controls.use_interval.set(not current)
 
     def _create_menu(self):
         """Create the main menu bar"""
@@ -89,109 +213,46 @@ class MainWindow:
 
     def _create_main_layout(self):
         """Create the main application layout"""
-        # Main container
-        self.main_frame = ttk.Frame(self.root)
-        self.main_frame.pack(fill='both', expand=True)
-
-        # Create left frame for plot
-        self.plot_frame = ttk.Frame(self.main_frame)
-        self.plot_frame.pack(side='left', fill='both', expand=True)
-
-        # Create right frame for controls
-        self.control_frame = ttk.Frame(self.main_frame)
-        self.control_frame.pack(side='right', fill='y')
-
-        # Add filter controls
-        self.filter_controls = FilterControls(self.control_frame, 
-                                            self._handle_control_event)
-
-    def _setup_plot(self):
-        """Setup the matplotlib plot"""
-        self.fig = Figure(figsize=(10, 6), dpi=100)
-        self.ax = self.fig.add_subplot(111)
-        
-        # Create canvas
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self.plot_frame)
-        self.canvas.draw()
-        self.canvas.get_tk_widget().pack(fill='both', expand=True)
-        
-        # Add toolbar
-        self.toolbar = NavigationToolbar2Tk(self.canvas, self.plot_frame)
-        self.toolbar.update()
-
-    def _create_status_bar(self):
-        """Create status bar at bottom of window"""
-        status_bar = ttk.Label(self.root, textvariable=self.status_var, 
-                             relief=tk.SUNKEN, anchor=tk.W)
-        status_bar.pack(side='bottom', fill='x')
-
-    def _load_file(self):
-        """Load an ATF file"""
         try:
-            filepath = filedialog.askopenfilename(
-                title="Select ATF file",
-                filetypes=[("ATF files", "*.atf"), ("All files", "*.*")]
+            # Main container using grid
+            self.main_frame = ttk.Frame(self.root)
+            self.main_frame.grid(row=0, column=0, sticky='nsew')
+            self.main_frame.grid_rowconfigure(0, weight=1)
+            self.main_frame.grid_columnconfigure(0, weight=3)  # Plot gets more space
+            self.main_frame.grid_columnconfigure(1, weight=1)  # Controls get less space
+
+            # Plot frame
+            self.plot_frame = ttk.Frame(self.main_frame)
+            self.plot_frame.grid(row=0, column=0, sticky='nsew', padx=5, pady=5)
+
+            # Controls frame with scrollbar
+            controls_container = ttk.Frame(self.main_frame)
+            controls_container.grid(row=0, column=1, sticky='nsew', padx=5, pady=5)
+            
+            # Create scrollable frame for controls
+            canvas = tk.Canvas(controls_container)
+            scrollbar = ttk.Scrollbar(controls_container, orient="vertical", command=canvas.yview)
+            self.control_frame = ttk.Frame(canvas)
+
+            # Configure scrolling
+            self.control_frame.bind(
+                "<Configure>",
+                lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
             )
+
+            canvas.create_window((0, 0), window=self.control_frame, anchor="nw")
+            canvas.configure(yscrollcommand=scrollbar.set)
+
+            # Pack canvas and scrollbar
+            canvas.pack(side="left", fill="both", expand=True)
+            scrollbar.pack(side="right", fill="y")
+
+            # Add filter controls
+            self.filter_controls = FilterControls(self.control_frame, self._handle_control_event)
             
-            if not filepath:
-                return
-
-            self.status_var.set(f"Loading {Path(filepath).name}...")
-            self.root.update()
-
-            # Load ATF file
-            self.atf_handler = ATFHandler(filepath)
-            if not self.atf_handler.load_atf():
-                raise ValueError("Failed to load ATF file")
-
-            # Get data
-            self.time_data = self.atf_handler.get_time_data()
-            self.original_data = self.atf_handler.get_current_data()
-            self.filtered_data = None
-
-            # Update plot
-            self._update_plot()
-            
-            # Update controls
-            self.filter_controls.set_time_range(
-                self.time_data[0], 
-                self.time_data[-1]
-            )
-            
-            # Update statistics
-            stats = calculate_signal_metrics(self.original_data)
-            self.filter_controls.update_statistics(stats)
-
-            self.status_var.set("File loaded successfully")
-
         except Exception as e:
-            messagebox.showerror("Error", f"Error loading file: {str(e)}")
-            self.status_var.set("Error loading file")
-
-    def _update_plot(self):
-        """Update the plot with current data"""
-        if self.original_data is None:
-            return
-
-        self.ax.clear()
-        
-        # Plot original data
-        self.ax.plot(self.time_data, self.original_data, 
-                    label='Original Signal', alpha=0.5)
-        
-        # Plot filtered data if available
-        if self.filtered_data is not None:
-            self.ax.plot(self.time_data, self.filtered_data, 
-                        label='Filtered Signal', linestyle='--')
-        
-        self.ax.set_xlabel('Time (s)')
-        self.ax.set_ylabel('Current (pA)')
-        self.ax.set_title('Signal Analysis')
-        self.ax.grid(True)
-        self.ax.legend()
-        
-        self.fig.tight_layout()
-        self.canvas.draw_idle()
+            messagebox.showerror("Layout Error", f"Error creating layout: {str(e)}")
+            raise
 
     def _handle_control_event(self, event: Dict[str, Any]):
         """Handle control panel events"""
